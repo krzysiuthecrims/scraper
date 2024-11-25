@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scraper ogłoszeń</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 0;
+      background-color: #f4f4f9;
+    }
+    .rezulty {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .listing {
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 10px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .listing img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+    .listing h4 {
+      font-size: 1.2em;
+      margin: 10px 0 5px;
+      color: #333;
+    }
+    .listing p {
+      font-size: 0.9em;
+      color: #666;
+    }
+    .listing a {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 5px 10px;
+      background-color: #712f85;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .listing a:hover {
+      background-color: #5a2269;
+    }
+    .listing button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      background-color: #d9534f;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .listing button:hover {
+      background-color: #c9302c;
+    }
+    #blacklist-section {
+      margin-top: 40px;
+    }
+    .group {
+  margin-bottom: 30px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.group h2 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.phone-group {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 10px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.phone-group h3 {
+  margin: 0 0 10px 0;
+}
+
+  </style>
+</head>
+<body>
+  <h1>Scraper ogłoszeń</h1>
+  <label for="searchUrlInput">URL wyszukiwania:</label>
+  <input type="text" id="searchUrlInput" style="width: 100%; margin-bottom: 10px;" 
+    value="https://pl.escort.club/anonse/towarzyskie/bielsko-biala/?province=24&district=&filter_price_type=&filter_price=0%3B25000&filter_age=18%3B39&filter_weight=30%3B59&filter_height=100%3B220&filter_breasts=3%3B8&breasts_type=&hair_colors=&sexual_orientation=&searchlang=&zodiac_sign=&q=">
+  
+  <button id="fetchData">Pokaż ogłoszenia</button>
+  <div id="results-nowosci" class="rezulty">
+    
+  </div>
+  <div id="results-ulubione" class="rezulty">
+  </div>
+  <div id="results-takieSe" class="rezulty">
+  </div>
+  <div id="results-czarnaLista" class="rezulty">
+  </div>
+
+  <script>
+    const apiKey = "$2a$10$H2X4RpNcSHdXokgP9SNzO.5mY8dOswBrRsGBMJOEec3kLK6tebE1C";
+    const jsonBinUrl = "https://api.jsonbin.io/v3/b/";
+    const dbId = "674492acacd3cb34a8ae930e"; // Twoje dbId
+    const phoneData = { mappings: {}, groups: {} }; // Dane w pamięci podręcznej
+
+    async function loadJsonBin() {
+      const response = await fetch(`${jsonBinUrl}${dbId}/latest`, {
+        headers: { "X-Master-Key": apiKey },
+      });
+      const data = await response.json();
+      Object.assign(phoneData, data.record);
+    }
+
+    async function updateJsonBin() {
+      await fetch(`${jsonBinUrl}${dbId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": apiKey,
+        },
+        body: JSON.stringify(phoneData),
+      });
+    }
+
+    async function fetchListings() {
+      const searchUrl = document.getElementById("searchUrlInput").value;
+  const response = await fetch(`https://cors-proxy-8row.onrender.com/${searchUrl}`);
+  const html = await response.text();
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const listings = doc.querySelectorAll("section.content-sec div.item-col");
+  await fetchMissingNumbers(listings);
+  const groups = groupByPhone(listings);
+  displayPhoneGroups(groups);
+}
+
+    function groupListingsByPhone(listings) {
+  const groups = {
+    nowosci: [],
+    ulubione: [],
+    takieSe: [],
+    czarnaLista: [],
+  };
+
+  listings.forEach((listing) => {
+    const id = extractIdFromLink(listing);
+    const phone = phoneData.mappings[id] || "Nieznany";
+    const group = phoneData.groups[phone] || "nowosci"; // Domyślnie nowości
+
+    groups[group].push(listing);
+  });
+
+  return groups;
+}
+
+
+
+    function displayListings(listings, container) {
+      container.innerHTML = "";
+
+      listings.forEach((listing) => {
+        const title = listing.querySelector(".item-name")?.innerText.trim() || "Brak tytułu";
+        const locationAge = listing.querySelector(".item-stats")?.innerText.trim() || "Brak danych lokalizacji/wieku";
+        const imageElement = listing.querySelector(".image.-item img");
+        const imageUrl = imageElement?.getAttribute("data-src") || imageElement?.getAttribute("src") || "Brak obrazka";
+        const linkElement = listing.querySelector("a[href*='https://pl.escort.club/anons']");
+        const link = linkElement?.getAttribute("href") || "#";
+        const id = extractIdFromLink(listing);
+        const phone = phoneData.mappings[id] || "Nieznany";
+
+        const div = document.createElement("div");
+        div.className = "listing";
+        div.id = id;
+        div.innerHTML = `
+          <img src="${imageUrl}" alt="${title}">
+          <h4>${title}</h4>
+          <p>${locationAge}</p>
+          <a href="${link}" target="_blank">Zobacz ogłoszenie</a>
+          <div class="details">
+            <strong>Telefon:</strong> ${phone}
+          </div>
+          <button onclick="addToBlacklist('${phone}')">Dodaj numer do czarnej listy</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function displayGroupedListings(groups, container) {
+  container.innerHTML = "";
+
+  Object.entries(groups).forEach(([groupName, listings]) => {
+    if (listings.length === 0) return;
+
+    const groupContainer = document.createElement("div");
+    groupContainer.className = "group";
+    groupContainer.innerHTML = `<h3>${formatGroupName(groupName)}</h3>`;
+
+    listings.forEach((listing) => {
+      const listingElement = createListingElement(listing);
+      listingElement.innerHTML += `
+        <button onclick="assignToGroup('${listingElement.id}', 'ulubione')">Ulubione</button>
+        <button onclick="assignToGroup('${listingElement.id}', 'takieSe')">Takie se</button>
+        <button onclick="assignToGroup('${listingElement.id}', 'czarnaLista')">Czarna lista</button>
+        <button onclick="assignToGroup('${listingElement.id}', 'nowosci')">Nowości</button>
+      `;
+      groupContainer.appendChild(listingElement);
+    });
+
+    container.appendChild(groupContainer);
+  });
+}
+
+function groupByPhone(listings) {
+  const groups = {
+    nowosci: {},
+    ulubione: {},
+    takieSe: {},
+    czarnaLista: {},
+  };
+
+  listings.forEach((listing) => {
+    const id = extractIdFromLink(listing);
+    const phone = phoneData.mappings[id] || "Nieznany";
+    const group = phoneData.groups[phone] || "nowosci"; // Domyślnie "Nowości"
+
+    if (!groups[group][phone]) {
+      groups[group][phone] = [];
+    }
+
+    groups[group][phone].push(listing);
+  });
+
+  return groups;
+}
+
+
+function displayPhoneGroups(groups) {
+    document.getElementById("results-nowosci").innerHTML = "";
+    document.getElementById("results-ulubione").innerHTML = "";
+    document.getElementById("results-takieSe").innerHTML = "";
+    document.getElementById("results-czarnaLista").innerHTML = "";
+
+  Object.entries(groups).forEach(([groupName, phoneGroups]) => {
+    if (Object.keys(phoneGroups).length === 0) return; // Pomijamy puste grupy
+
+    // Tworzymy kontener dla grupy
+    const groupContainer = document.createElement("div");
+    groupContainer.className = `group ${groupName}`; // Dodajemy klasę grupy
+    groupContainer.innerHTML = `<h2>${formatGroupName(groupName)}</h2>`;
+
+    // Tworzymy siatkę dla zawartości grupy
+    const gridContainer = document.createElement("div");
+    gridContainer.className = "group-grid";
+
+    Object.entries(phoneGroups).forEach(([phone, listings]) => {
+      // Tworzymy kontener dla numeru telefonu
+      const phoneContainer = document.createElement("div");
+      phoneContainer.className = "phone-group";
+          // Usuwamy prefiks +48 i wszystkie białe znaki
+      let cleaned = phone.replace("+48", "").trim().replace(/\s+/g, "");
+
+      // Dzielimy numer na trzy części i łączymy z myślnikami
+      let garsoNumber = cleaned.replace(/^(\d{3})(\d{3})(\d{3})$/, "$1-$2-$3");
+      
+      phoneContainer.innerHTML = `
+        <h3>Numer telefonu: ${phone}</h3>
+        <button onclick="assignToGroup('${phone}', 'ulubione')">Ulubione</button>
+        <button onclick="assignToGroup('${phone}', 'takieSe')">Takie se</button>
+        <button onclick="assignToGroup('${phone}', 'czarnaLista')">Czarna lista</button>
+        <button onclick="assignToGroup('${phone}', 'nowosci')">Nowości</button>
+        <button onclick="copyToClip('${garsoNumber}')">garsoNum</button>
+        <form method="post" action="https://www.garsoniera.com.pl/forum/index.php?app=core&module=search&section=search&do=search&fromsearch=1"><input name="search_term" type="hidden" value="&quot;` + garsoNumber + `&quot;"><input type="submit" formtarget="_blank" class="submit_input clickable" value="GARSO"></form>`;
+
+      // Dodajemy ogłoszenia powiązane z numerem telefonu
+      listings.forEach((listing) => {
+        const listingElement = createListingElement(listing);
+        phoneContainer.appendChild(listingElement);
+      });
+
+      gridContainer.appendChild(phoneContainer);
+    });
+
+    groupContainer.appendChild(gridContainer);
+
+    document.getElementById("results-" + groupName).appendChild(groupContainer);
+  });
+}
+
+function copyToClip(garsonumer){
+  navigator.clipboard.writeText(`"` + garsonumer + `"`)
+}
+
+
+function formatGroupName(name) {
+  const mapping = {
+    nowosci: "Nowości",
+    ulubione: "Ulubione",
+    takieSe: "Takie se",
+    czarnaLista: "Czarna lista",
+  };
+  return mapping[name] || name;
+}
+
+
+function createListingElement(listing) {
+  const title = listing.querySelector(".item-name")?.innerText.trim() || "Brak tytułu";
+  const locationAge = listing.querySelector(".item-stats")?.innerText.trim() || "Brak danych lokalizacji/wieku";
+  const imageElement = listing.querySelector(".image.-item img");
+  const imageUrl = imageElement?.getAttribute("data-src") || imageElement?.getAttribute("src") || "Brak obrazka";
+  const linkElement = listing.querySelector("a[href*='https://pl.escort.club/anons']");
+  const link = linkElement?.getAttribute("href") || "#";
+  const tooltipInfo = listing.querySelector(".content-item__tooltip");
+
+    // Wyciąganie tylko informacji o cenie, wadze i wzroście
+    let price = "Brak danych";
+    let weight = "Brak danych";
+    let height = "Brak danych";
+
+    if (tooltipInfo) {
+      const detailItems = tooltipInfo.querySelectorAll(".-title");
+
+      detailItems.forEach((detail) => {
+        const title = detail.innerText.trim();
+        const content = detail.querySelector(".-content")?.innerText.trim();
+
+        if (title.includes("Cena")) {
+          price = content || "Brak danych";
+        } else if (title.includes("Waga")) {
+          weight = content || "Brak danych";
+        } else if (title.includes("Wzrost")) {
+          height = content || "Brak danych";
+        }
+      });
+    }
+    const div = document.createElement("div");
+    div.className = "listing";
+    div.innerHTML = `
+      <img src="${imageUrl}" alt="${title}">
+            <h4>${title}</h4>
+            <p>${locationAge}</p>
+            <a href="${link}" target="_blank">Zobacz ogłoszenie</a>
+                          <div style="margin-top: 10px;">
+                  <strong>Szczegóły:</strong><br>
+                  Cena: ${price}<br>
+                  Waga: ${weight}<br>
+                  Wzrost: ${height}
+                </div>
+    `;
+    return div;
+  }
+
+
+
+    async function fetchMissingNumbers(listings) {
+      //const listings = document.querySelectorAll("div.listing");
+      var changed = false;
+      for (const listing of listings) {
+        const id = extractIdFromLink(listing);
+
+        if (!phoneData.mappings[id]) {
+          const phone = await fetchPhoneNumber(id);
+          phoneData.mappings[id] = phone;
+          changed = true;
+        }
+      }
+      if(changed)
+      {
+      await updateJsonBin();
+      }
+    }
+
+    async function fetchPhoneNumber(id) {
+      try {
+        var phoneUrl = "https://cors-proxy-8row.onrender.com/https://pl.escort.club/includes/ajax.show-phone.php"
+        var lngth = 0 + id.length + 3;
+        const response = await fetch(
+          phoneUrl,
+          { 
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+              "Content-Length": lngth
+            },
+            body: `id=${id}`,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        var res = data.phone;
+        if(res == undefined)
+        {
+          throw new Error(data);;
+        }
+        return res;
+      } catch (error) {
+        console.error(`Błąd podczas pobierania numeru telefonu dla ID ${id}:`, error);
+        throw error;
+      }
+    }
+
+    function extractIdFromLink(listing) {
+      const link = listing.querySelector("a[href*='https://pl.escort.club/anons']");
+      const href = link.getAttribute("href");
+      return href.split("/").pop().split(".html")[0];
+    }
+
+    function assignToGroup(phone, group) {
+      phoneData.groups[phone] = group;
+      updateJsonBin(); // Zapisz zmiany
+      fetchListings(); // Odśwież widok
+    }
+
+
+    document.getElementById("fetchData").addEventListener("click", fetchListings);
+    loadJsonBin();
+  </script>
+</body>
+</html>
