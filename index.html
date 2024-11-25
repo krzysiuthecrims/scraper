@@ -106,6 +106,9 @@
   </style>
 </head>
 <body>
+  <div id="passwordDiv"><input type="text" id="passwordInput"> <button onclick="passwordCheck()">Dalej</button></div>
+  <div id="pass-success" style="display:none"><h1>Hasło prawidłowe</h1></div>
+  <div id="all-content" style="display:none">
   <h1>Scraper ogłoszeń</h1>
   <label for="searchUrlInput">URL wyszukiwania:</label>
   <input type="text" id="searchUrlInput" style="width: 100%; margin-bottom: 10px;" 
@@ -121,7 +124,7 @@
   </div>
   <div id="results-czarnaLista" class="rezulty">
   </div>
-
+  </div>
   <script>
     const apiKey = "$2a$10$H2X4RpNcSHdXokgP9SNzO.5mY8dOswBrRsGBMJOEec3kLK6tebE1C";
     const jsonBinUrl = "https://api.jsonbin.io/v3/b/";
@@ -436,6 +439,18 @@ function createListingElement(listing) {
       phoneData.groups[phone] = group;
       updateJsonBin(); // Zapisz zmiany
       fetchListings(); // Odśwież widok
+    }
+
+    function passwordCheck(){
+      var password = document.getElementById('passwordInput').value;
+      if(password == 'escort'){
+        document.getElementById('all-content').style = '';
+        document.getElementById('passwordDiv').style = 'display:none';
+      }
+      if(password == 'bomba'){
+        document.getElementById('pass-success').style = '';
+        document.getElementById('passwordDiv').style = 'display:none';
+      }
     }
 
 
