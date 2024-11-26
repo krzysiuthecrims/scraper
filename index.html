@@ -133,7 +133,8 @@
     const dbId = "674492acacd3cb34a8ae930e"; // Twoje dbId
     const phoneData = { mappings: {}, groups: {} }; // Dane w pamięci podręcznej
     const statusLabel = document.getElementById("statusLabel");
-
+    
+    let uniquePhones = new Set();
     let cachedlistings = undefined;
     async function fetchDataClicked()
     {
@@ -144,6 +145,7 @@
       statusLabel.innerHTML = "Start";
       if(fullReload)
       {
+        uniquePhones = new Set();
         const searchUrl = document.getElementById("searchUrlInput").value;
         statusLabel.innerHTML = "Pobieranie ogłoszeń";
         const response = await fetch(`https://cors-proxy-8row.onrender.com/${searchUrl}`);
@@ -153,11 +155,18 @@
         cachedlistings = doc.querySelectorAll("section.content-sec div.item-col");
         statusLabel.innerHTML = "Skończono pobieranie, pobieranie numerów";
         await fetchMissingNumbers(cachedlistings);
+        cachedlistings.forEach((listing) => {
+          const id = extractIdFromLink(listing);
+          const phone = phoneData.mappings[id];
+          if (!uniquePhones.has(phone)) 
+            uniquePhones.add(phone); 
+        });
+
       }
       statusLabel.innerHTML = "Grupowanie";
       const groups = groupByPhone(cachedlistings);
       displayPhoneGroups(groups);
-      statusLabel.innerHTML = "Sukces";
+      statusLabel.innerHTML = "Sukces. Ogłoszenia: " + cachedlistings.length + ". Numery telefonów: " + uniquePhones.size + ". (Nadmiariowych: "+(cachedlistings.length - uniquePhones.size)+")";
     }
 
     function groupListingsByPhone(listings) {
