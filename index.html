@@ -186,7 +186,7 @@
 
           const groupContainer = document.createElement("div");
           groupContainer.className = "group";
-          groupContainer.innerHTML = `<h3>${formatGroupName(groupName)}</h3>`;
+          groupContainer.innerHTML = `<h3>${formatGroupName(groupName, -1)}</h3>`;
 
           listings.forEach((listing) => {
             const listingElement = createListingElement(listing);
@@ -235,11 +235,12 @@ function displayPhoneGroups(groups) {
 
   Object.entries(groups).forEach(([groupName, phoneGroups]) => {
     if (Object.keys(phoneGroups).length === 0) return; // Pomijamy puste grupy
+    const phoneCount = Object.keys(phoneGroups).length;
 
     // Tworzymy kontener dla grupy
     const groupContainer = document.createElement("div");
     groupContainer.className = `group ${groupName}`; // Dodajemy klasę grupy
-    groupContainer.innerHTML = `<h2>${formatGroupName(groupName)}</h2>`;
+    groupContainer.innerHTML = `<h2>${formatGroupName(groupName, phoneCount)}</h2>`;
 
     // Tworzymy siatkę dla zawartości grupy
     const gridContainer = document.createElement("div");
@@ -284,14 +285,14 @@ function copyToClip(garsonumer){
 }
 
 
-function formatGroupName(name) {
+function formatGroupName(name, countOfNumbers) {
   const mapping = {
     nowosci: "Nowości",
     ulubione: "Ulubione",
     takieSe: "Takie se",
     czarnaLista: "Czarna lista",
   };
-  return mapping[name] || name;
+  return mapping[name] + ( countOfNumbers > -1 ? "("+countOfNumbers+")" :"") ;
 }
 
 
