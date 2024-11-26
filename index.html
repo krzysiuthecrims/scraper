@@ -114,7 +114,8 @@
   <input type="text" id="searchUrlInput" style="width: 100%; margin-bottom: 10px;" 
     value="https://pl.escort.club/anonse/towarzyskie/bielsko-biala/?province=24&district=&filter_price_type=&filter_price=0%3B25000&filter_age=18%3B39&filter_weight=30%3B59&filter_height=100%3B220&filter_breasts=3%3B8&breasts_type=&hair_colors=&sexual_orientation=&searchlang=&zodiac_sign=&q=">
   
-  <button id="fetchData">Pokaż ogłoszenia</button>
+    <button id="fetchData">Pokaż ogłoszenia</button>
+    <p id="statusLabel"></p>
   <div id="results-nowosci" class="rezulty">
     
   </div>
@@ -130,135 +131,91 @@
     const jsonBinUrl = "https://api.jsonbin.io/v3/b/";
     const dbId = "674492acacd3cb34a8ae930e"; // Twoje dbId
     const phoneData = { mappings: {}, groups: {} }; // Dane w pamięci podręcznej
+    const statusLabel = document.getElementById("statusLabel");
 
-    async function loadJsonBin() {
-      const response = await fetch(`${jsonBinUrl}${dbId}/latest`, {
-        headers: { "X-Master-Key": apiKey },
-      });
-      const data = await response.json();
-      Object.assign(phoneData, data.record);
-    }
-
-    async function updateJsonBin() {
-      await fetch(`${jsonBinUrl}${dbId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Master-Key": apiKey,
-        },
-        body: JSON.stringify(phoneData),
-      });
-    }
 
     async function fetchListings() {
+      statusLabel.innerHTML = "Start";
       const searchUrl = document.getElementById("searchUrlInput").value;
-  const response = await fetch(`https://cors-proxy-8row.onrender.com/${searchUrl}`);
-  const html = await response.text();
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const listings = doc.querySelectorAll("section.content-sec div.item-col");
-  await fetchMissingNumbers(listings);
-  const groups = groupByPhone(listings);
-  displayPhoneGroups(groups);
-}
+      statusLabel.innerHTML = "Pobieranie ogłoszeń";
+      const response = await fetch(`https://cors-proxy-8row.onrender.com/${searchUrl}`);
+      statusLabel.innerHTML = "Skończono pobieranie";
+      const html = await response.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const listings = doc.querySelectorAll("section.content-sec div.item-col");
+      statusLabel.innerHTML = "Skończono pobieranie, pobieranie numerów";
+      await fetchMissingNumbers(listings);
+      statusLabel.innerHTML = "Grupowanie";
+      const groups = groupByPhone(listings);
+      displayPhoneGroups(groups);
+      statusLabel.innerHTML = "Sukces";
+    }
 
     function groupListingsByPhone(listings) {
-  const groups = {
-    nowosci: [],
-    ulubione: [],
-    takieSe: [],
-    czarnaLista: [],
-  };
-
-  listings.forEach((listing) => {
-    const id = extractIdFromLink(listing);
-    const phone = phoneData.mappings[id] || "Nieznany";
-    const group = phoneData.groups[phone] || "nowosci"; // Domyślnie nowości
-
-    groups[group].push(listing);
-  });
-
-  return groups;
-}
-
-
-
-    function displayListings(listings, container) {
-      container.innerHTML = "";
-
+      const groups = {
+        nowosci: [],
+        ulubione: [],
+        takieSe: [],
+        czarnaLista: [],
+      };
       listings.forEach((listing) => {
-        const title = listing.querySelector(".item-name")?.innerText.trim() || "Brak tytułu";
-        const locationAge = listing.querySelector(".item-stats")?.innerText.trim() || "Brak danych lokalizacji/wieku";
-        const imageElement = listing.querySelector(".image.-item img");
-        const imageUrl = imageElement?.getAttribute("data-src") || imageElement?.getAttribute("src") || "Brak obrazka";
-        const linkElement = listing.querySelector("a[href*='https://pl.escort.club/anons']");
-        const link = linkElement?.getAttribute("href") || "#";
-        const id = extractIdFromLink(listing);
-        const phone = phoneData.mappings[id] || "Nieznany";
+          const id = extractIdFromLink(listing);
+          const phone = phoneData.mappings[id] || "Nieznany";
+          const group = phoneData.groups[phone] || "nowosci"; // Domyślnie nowości
 
-        const div = document.createElement("div");
-        div.className = "listing";
-        div.id = id;
-        div.innerHTML = `
-          <img src="${imageUrl}" alt="${title}">
-          <h4>${title}</h4>
-          <p>${locationAge}</p>
-          <a href="${link}" target="_blank">Zobacz ogłoszenie</a>
-          <div class="details">
-            <strong>Telefon:</strong> ${phone}
-          </div>
-          <button onclick="addToBlacklist('${phone}')">Dodaj numer do czarnej listy</button>
-        `;
-        container.appendChild(div);
-      });
-    }
+          groups[group].push(listing);
+        });
+
+        return groups;
+      }
 
     function displayGroupedListings(groups, container) {
-  container.innerHTML = "";
+        container.innerHTML = "";
 
-  Object.entries(groups).forEach(([groupName, listings]) => {
-    if (listings.length === 0) return;
+        Object.entries(groups).forEach(([groupName, listings]) => {
+          if (listings.length === 0) return;
 
-    const groupContainer = document.createElement("div");
-    groupContainer.className = "group";
-    groupContainer.innerHTML = `<h3>${formatGroupName(groupName)}</h3>`;
+          const groupContainer = document.createElement("div");
+          groupContainer.className = "group";
+          groupContainer.innerHTML = `<h3>${formatGroupName(groupName)}</h3>`;
 
-    listings.forEach((listing) => {
-      const listingElement = createListingElement(listing);
-      listingElement.innerHTML += `
-        <button onclick="assignToGroup('${listingElement.id}', 'ulubione')">Ulubione</button>
-        <button onclick="assignToGroup('${listingElement.id}', 'takieSe')">Takie se</button>
-        <button onclick="assignToGroup('${listingElement.id}', 'czarnaLista')">Czarna lista</button>
-        <button onclick="assignToGroup('${listingElement.id}', 'nowosci')">Nowości</button>
-      `;
-      groupContainer.appendChild(listingElement);
-    });
+          listings.forEach((listing) => {
+            const listingElement = createListingElement(listing);
+            listingElement.innerHTML += `
+              <button onclick="assignToGroup('${listingElement.id}', 'ulubione')">Ulubione</button>
+              <button onclick="assignToGroup('${listingElement.id}', 'takieSe')">Takie se</button>
+              <button onclick="assignToGroup('${listingElement.id}', 'czarnaLista')">Czarna lista</button>
+              <button onclick="assignToGroup('${listingElement.id}', 'nowosci')">Nowości</button>
+            `;
+            groupContainer.appendChild(listingElement);
+          });
 
-    container.appendChild(groupContainer);
-  });
-}
+          container.appendChild(groupContainer);
+        });
+      }
 
-function groupByPhone(listings) {
-  const groups = {
-    nowosci: {},
-    ulubione: {},
-    takieSe: {},
-    czarnaLista: {},
-  };
+    function groupByPhone(listings) {
+      const groups = {
+        nowosci: {},
+        ulubione: {},
+        takieSe: {},
+        czarnaLista: {},
+      };
 
-  listings.forEach((listing) => {
-    const id = extractIdFromLink(listing);
-    const phone = phoneData.mappings[id] || "Nieznany";
-    const group = phoneData.groups[phone] || "nowosci"; // Domyślnie "Nowości"
+      listings.forEach((listing) => {
+        const id = extractIdFromLink(listing);
+        const phone = phoneData.mappings[id] || "Nieznany";
+        const group = phoneData.groups[phone] || "nowosci"; // Domyślnie "Nowości"
 
-    if (!groups[group][phone]) {
-      groups[group][phone] = [];
+        if (!groups[group][phone]) {
+          groups[group][phone] = [];
+        }
+
+        groups[group][phone].push(listing);
+      });
+
+      return groups;
     }
-
-    groups[group][phone].push(listing);
-  });
-
-  return groups;
-}
 
 
 function displayPhoneGroups(groups) {
@@ -451,6 +408,25 @@ function createListingElement(listing) {
         document.getElementById('pass-success').style = '';
         document.getElementById('passwordDiv').style = 'display:none';
       }
+    }
+
+    async function loadJsonBin() {
+      const response = await fetch(`${jsonBinUrl}${dbId}/latest`, {
+        headers: { "X-Master-Key": apiKey },
+      });
+      const data = await response.json();
+      Object.assign(phoneData, data.record);
+    }
+
+    async function updateJsonBin() {
+      await fetch(`${jsonBinUrl}${dbId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": apiKey,
+        },
+        body: JSON.stringify(phoneData),
+      });
     }
 
 
