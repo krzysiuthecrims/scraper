@@ -114,7 +114,8 @@
   <input type="text" id="searchUrlInput" style="width: 100%; margin-bottom: 10px;" 
     value="https://pl.escort.club/anonse/towarzyskie/bielsko-biala/?province=24&district=&filter_price_type=&filter_price=0%3B25000&filter_age=18%3B39&filter_weight=30%3B59&filter_height=100%3B220&filter_breasts=3%3B8&breasts_type=&hair_colors=&sexual_orientation=&searchlang=&zodiac_sign=&q=">
   
-    <button id="fetchData">Pokaż ogłoszenia</button>
+    <button id="fetchData" disabled>Pokaż ogłoszenia</button>
+    <button id="saveChangesButton" style="display: none;">ZAPISZ ZMIANY W GRUPACH</button>
     <p id="statusLabel"></p>
   <div id="results-nowosci" class="rezulty">
     
@@ -133,20 +134,28 @@
     const phoneData = { mappings: {}, groups: {} }; // Dane w pamięci podręcznej
     const statusLabel = document.getElementById("statusLabel");
 
+    let cachedlistings = undefined;
+    async function fetchDataClicked()
+    {
+      await fetchListings(true);
+    }
 
-    async function fetchListings() {
+    async function fetchListings(fullReload) {
       statusLabel.innerHTML = "Start";
-      const searchUrl = document.getElementById("searchUrlInput").value;
-      statusLabel.innerHTML = "Pobieranie ogłoszeń";
-      const response = await fetch(`https://cors-proxy-8row.onrender.com/${searchUrl}`);
-      statusLabel.innerHTML = "Skończono pobieranie";
-      const html = await response.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-      const listings = doc.querySelectorAll("section.content-sec div.item-col");
-      statusLabel.innerHTML = "Skończono pobieranie, pobieranie numerów";
-      await fetchMissingNumbers(listings);
+      if(fullReload)
+      {
+        const searchUrl = document.getElementById("searchUrlInput").value;
+        statusLabel.innerHTML = "Pobieranie ogłoszeń";
+        const response = await fetch(`https://cors-proxy-8row.onrender.com/${searchUrl}`);
+        statusLabel.innerHTML = "Skończono pobieranie";
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        cachedlistings = doc.querySelectorAll("section.content-sec div.item-col");
+        statusLabel.innerHTML = "Skończono pobieranie, pobieranie numerów";
+        await fetchMissingNumbers(cachedlistings);
+      }
       statusLabel.innerHTML = "Grupowanie";
-      const groups = groupByPhone(listings);
+      const groups = groupByPhone(cachedlistings);
       displayPhoneGroups(groups);
       statusLabel.innerHTML = "Sukces";
     }
@@ -349,7 +358,7 @@ function createListingElement(listing) {
       }
       if(changed)
       {
-      await updateJsonBin();
+        await updateJsonBin();
       }
     }
 
@@ -394,8 +403,8 @@ function createListingElement(listing) {
 
     function assignToGroup(phone, group) {
       phoneData.groups[phone] = group;
-      updateJsonBin(); // Zapisz zmiany
-      fetchListings(); // Odśwież widok
+      document.getElementById("saveChangesButton").style = "font-size: 20pt; background-color: #FF0000; padding:2px; color: #FFFFFF;";
+      fetchListings(false); // Odśwież widok
     }
 
     function passwordCheck(){
@@ -411,11 +420,14 @@ function createListingElement(listing) {
     }
 
     async function loadJsonBin() {
+      statusLabel.innerHTML = "Wczytywanie";
       const response = await fetch(`${jsonBinUrl}${dbId}/latest`, {
         headers: { "X-Master-Key": apiKey },
       });
       const data = await response.json();
       Object.assign(phoneData, data.record);
+      statusLabel.innerHTML = "Numery wczytane";
+      document.getElementById("fetchData").disabled = false;
     }
 
     async function updateJsonBin() {
@@ -429,8 +441,17 @@ function createListingElement(listing) {
       });
     }
 
+    async function saveChangesClick() {
+      statusLabel.innerHTML = "Zapisywanie";
+      await updateJsonBin();
+      document.getElementById("saveChangesButton").style = "display:none;";
+      statusLabel.innerHTML = "Sukces";
+    }
 
-    document.getElementById("fetchData").addEventListener("click", fetchListings);
+
+    document.getElementById("fetchData").addEventListener("click", fetchDataClicked);
+    document.getElementById("saveChangesButton").addEventListener("click", saveChangesClick);
+    
     loadJsonBin();
   </script>
 </body>
